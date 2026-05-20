@@ -1,0 +1,204 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
+import random
+import string
+import json
+import os
+from datetime import datetime
+
+DATA_FILE = "saved_passwords.json"
+
+class PasswordGeneratorMobile:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Password Generator")
+        self.root.geometry("400x700")
+        self.root.configure(bg="#2c3e50")
+        
+        self.saved_passwords = []
+        self.load_passwords()
+        
+        # Style Configuration
+        style = ttk.Style()
+        style.theme_use("clam")
+        style.configure("TCheckbutton", background="#34495e", foreground="white")
+        style.configure("TButton", font=("Arial", 10, "bold"))
+        
+        # Title
+        tk.Label(root, text="Password Generator", font=("Arial", 18, "bold"), 
+                 bg="#2c3e50", fg="#3498db").pack(pady=10)
+        
+        # Config Frame
+        config_frame = tk.Frame(root, bg="#34495e", padx=10, pady=10)
+        config_frame.pack(pady=5, padx=15, fill="x")
+        
+        # Length
+        length_frame = tk.Frame(config_frame, bg="#34495e")
+        length_frame.pack(fill="x", pady=5)
+        tk.Label(length_frame, text="Length (4-50):", bg="#34495e", fg="white").pack(side="left")
+        self.total_var = tk.IntVar(value=12)
+        tk.Entry(length_frame, textvariable=self.total_var, width=6, justify="center").pack(side="left", padx=10)
+        
+        # Checkboxes
+        self.letters_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(config_frame, text="Include Letters", variable=self.letters_var).pack(anchor="w", pady=2)
+        
+        self.numbers_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(config_frame, text="Include Numbers", variable=self.numbers_var).pack(anchor="w", pady=2)
+        
+        self.symbols_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(config_frame, text="Include Symbols", variable=self.symbols_var).pack(anchor="w", pady=2)
+        
+        # Output Frame
+        out_frame = tk.Frame(root, bg="#2c3e50")
+        out_frame.pack(pady=5, padx=15, fill="x")
+        
+        self.password_var = tk.StringVar()
+        self.entry_res = tk.Entry(out_frame, textvariable=self.password_var, font=("Arial", 12, "bold"), justify="center", bg="white", fg="black")
+        self.entry_res.pack(fill="x", pady=5)
+        
+        # Action Buttons
+        btn_frame = tk.Frame(root, bg="#2c3e50")
+        btn_frame.pack(pady=5)
+        ttk.Button(btn_frame, text="Generate", command=self.generate_password).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="Copy Password", command=self.copy_to_clipboard).pack(side="left", padx=5)
+        
+        # New Fixed Save Frame (بديلة للنافذة المنبثقة المشوهة)
+        save_box = tk.LabelFrame(root, text=" Save Current Password ", bg="#34495e", fg="#2ecc71", font=("Arial", 10, "bold"), padx=10, pady=5)
+        save_box.pack(pady=8, padx=15, fill="x")
+        
+        tk.Label(save_box, text="Website:", bg="#34495e", fg="white").grid(row=0, column=0, sticky="w", pady=2)
+        self.web_entry = tk.Entry(save_box, width=18)
+        self.web_entry.grid(row=0, column=1, padx=5, pady=2, sticky="we")
+        
+        tk.Label(save_box, text="Username:", bg="#34495e", fg="white").grid(row=1, column=0, sticky="w", pady=2)
+        self.user_entry = tk.Entry(save_box, width=18)
+        self.user_entry.grid(row=1, column=1, padx=5, pady=2, sticky="we")
+        
+        save_btn = tk.Button(save_box, text="Confirm Save", command=self.save_password_action, bg="#2ecc71", fg="white", font=("Arial", 9, "bold"))
+        save_btn.grid(row=0, column=2, rowspan=2, padx=10, sticky="ns")
+        save_box.columnconfigure(1, weight=1)
+        
+        # List Frame
+        tk.Label(root, text="Saved Passwords:", font=("Arial", 12, "bold"), bg="#2c3e50", fg="#3498db").pack(anchor="w", padx=15, pady=(5,0))
+        
+        list_frame = tk.Frame(root, bg="#34495e")
+        list_frame.pack(pady=5, padx=15, fill="both", expand=True)
+        
+        self.listbox = tk.Listbox(list_frame, bg="#1a252f", fg="white", font=("Arial", 10), selectbackground="#3498db")
+        self.listbox.pack(fill="both", expand=True, side="left")
+        
+        scrollbar = tk.Scrollbar(list_frame, orient="vertical", command=self.listbox.yview)
+        scrollbar.pack(side="right", fill="y")
+        self.listbox.config(yscrollcommand=scrollbar.set)
+        
+        # List Buttons
+        list_btn_frame = tk.Frame(root, bg="#2c3e50")
+        list_btn_frame.pack(pady=5)
+        ttk.Button(list_btn_frame, text="Copy Selected", command=self.copy_selected).pack(side="left", padx=5)
+        ttk.Button(list_btn_frame, text="Delete Selected", command=self.delete_selected).pack(side="left", padx=5)
+        
+        self.refresh_list()
+
+    def load_passwords(self):
+        if os.path.exists(DATA_FILE):
+            try:
+                with open(DATA_FILE, "r", encoding="utf-8") as f:
+                    self.saved_passwords = json.load(f)
+            except:
+                self.saved_passwords = []
+
+    def save_to_file(self):
+        try:
+            with open(DATA_FILE, "w", encoding="utf-8") as f:
+                json.dump(self.saved_passwords, f, indent=2, ensure_ascii=False)
+        except:
+            pass
+
+    def refresh_list(self):
+        self.listbox.delete(0, tk.END)
+        for pw in self.saved_passwords:
+            display_text = f"🌐 {pw.get('website')} | 👤 {pw.get('username')}"
+            self.listbox.insert(tk.END, display_text)
+
+    def generate_password(self):
+        try:
+            length = self.total_var.get()
+        except:
+            messagebox.showerror("Error", "Invalid length!")
+            return
+            
+        if length < 4 or length > 50:
+            messagebox.showerror("Error", "Length must be 4-50")
+            return
+            
+        chars = ""
+        if self.letters_var.get(): chars += string.ascii_letters
+        if self.numbers_var.get(): chars += string.digits
+        if self.symbols_var.get(): chars += string.punctuation
+        
+        if not chars:
+            messagebox.showwarning("Warning", "Select at least one option!")
+            return
+            
+        password = "".join(random.choices(chars, k=length))
+        self.password_var.set(password)
+
+    def copy_to_clipboard(self):
+        pw = self.password_var.get()
+        if pw:
+            self.root.clipboard_clear()
+            self.root.clipboard_append(pw)
+            messagebox.showinfo("Success", "Password copied!")
+
+    def save_password_action(self):
+        pw = self.password_var.get()
+        if not pw:
+            messagebox.showwarning("Warning", "Generate a password first!")
+            return
+            
+        web = self.web_entry.get().strip()
+        user = self.user_entry.get().strip() or "N/A"
+        
+        if not web:
+            messagebox.showwarning("Warning", "Please enter a Website name!")
+            return
+            
+        self.saved_passwords.append({
+            "website": web,
+            "username": user,
+            "password": pw,
+            "date": datetime.now().strftime("%Y-%m-%d")
+        })
+        self.save_to_file()
+        self.refresh_list()
+        
+        # تفريغ خانات الحفظ بعد إتمام العملية بنجاح
+        self.web_entry.delete(0, tk.END)
+        self.user_entry.delete(0, tk.END)
+        messagebox.showinfo("Success", f"Saved successfully for {web}!")
+
+    def copy_selected(self):
+        try:
+            idx = self.listbox.curselection()[0]
+            pw = self.saved_passwords[idx]["password"]
+            self.root.clipboard_clear()
+            self.root.clipboard_append(pw)
+            messagebox.showinfo("Success", "Selected password copied!")
+        except:
+            messagebox.showwarning("Warning", "Select an item from the list first!")
+
+    def delete_selected(self):
+        try:
+            idx = self.listbox.curselection()[0]
+            self.saved_passwords.pop(idx)
+            self.save_to_file()
+            self.refresh_list()
+            messagebox.showinfo("Success", "Deleted!")
+        except:
+            messagebox.showwarning("Warning", "Select an item from the list first!")
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = PasswordGeneratorMobile(root)
+    root.mainloop()
